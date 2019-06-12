@@ -8,16 +8,16 @@ ODIR=obj
 INCLUDES = $(wildcard include/*.h)
 DEPS = $(patsubt %,$(IDIR)/%,$(INCLUDES))
 
-SRC	= $(wildcard src/*.c)
+SRC = $(wildcard src/*.c)
 _OBJ = $(patsubst src/%.c, %.o, $(SRC))
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: $(SRCDIR)/%.c $(DEPS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+	$(CC) -g -c -o $@ $< $(CFLAGS)
 	@echo "Compiled "$<" successfully!"
 
 $(BIN): $(OBJ)
-	$(CC) -o $@ $^ $(CFLAGS)
+	$(CC) -g -o $@ $^ $(CFLAGS)
 
 .PHONY: clean memcheck
 
