@@ -1,7 +1,11 @@
 #include "util.h"
+#include "builtin_commands.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 char *emposh_read_line()
 {
@@ -19,7 +23,7 @@ char **emposh_split_line(char *line)
         CHECK_MALLOC_RETURN(each_word);
         int index = 0;
         
-        word = strtok(line, " \t");
+        word = strtok(line, " \t\n");
         while (word != NULL) {
                 each_word[index++] = word;
                 
@@ -30,12 +34,55 @@ char **emposh_split_line(char *line)
                         CHECK_MALLOC_RETURN(each_word);
                 }
 
-                word = strtok(NULL, " \t");
+                word = strtok(NULL, " \t\n");
         }
         
         each_word[index] = NULL;
 
         return each_word;
+}
+
+int emposh_launch(char **args)
+{
+        pid_t pid, wpid;
+        int status;
+
+        pid = fork();
+        if (pid == 0) {
+                // this is child process
+                if (execvp(args[0], args) == -1) {
+                        perror("emposh");
+                }
+                exit(EXIT_FAILURE);
+        } else if (pid < 0) {
+                // error forking
+                perror("emposh");
+        } else {
+                // this is parent process
+                do {
+                        wpid = waitpid(pid, &status, WUNTRACED);
+                } while (!WIFEXITED(status) && !WIFSIGNALED(status));
+        }
+
+        return 1;
+}
+
+int emposh_execute(char **args)
+{
+        int i;
+
+        if (args[0] == NULL) {
+                // An empty command was entered
+                return 1;
+        }
+
+        for (i = 0; i < emposh_num_builtins(); i++) {
+                if (strcmp(args[0], builtin_str[i]) == 0) {
+                        return (*builtin_func[i])(args);
+                }
+        }
+
+        return emposh_launch(args);
 }
 
 void emposh_loop()
@@ -50,19 +97,9 @@ void emposh_loop()
                 printf("> ");
                 line = emposh_read_line();
                 args = emposh_split_line(line);
-                
-                args_len = 0;
-                line = args[args_len];
-                while (line != NULL) {
-                        printf("-> %s\n", line);
-                        line = args[++args_len];
-                }
-                printf("args_len: %d\n", args_len);
-                // parse
-                // run
-                status = 0;
+                status = emposh_execute(args);
                 
                 free(line);
                 free(args);
-        } while (status);
+        } while (status != 0);
 }
